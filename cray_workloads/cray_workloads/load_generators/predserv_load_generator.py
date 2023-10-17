@@ -44,33 +44,37 @@ class PredServLoadGenerator(TraceLoadGenerator):
                          trace_path=trace_path,
                          trace_scale_factor=trace_scale_factor,
                          load_normaliser=load_normaliser)
+        # data_path is the image path
         with open(data_path, 'rb') as data_file:
-            data = pickle.load(data_file, encoding='latin1')
-            data_file.close()
-        X_te = data['vali']['x'][:max_num_te_data, :]
-        if model_path == 'train':
-            X_tr = data['train']['x'][:max_num_tr_data, :]
-            Y_tr = data['train']['y'][:max_num_tr_data]
-            self.model = RandomForestRegressor()
-            self.model.fit(X_tr, Y_tr)
-            logger.info('Trained model %s', self.model)
-#             # Save the image -------------------------------------------------------------
-#             with open('../../train_data/news_rfr.p', 'wb') as model_file:
-#                 pickle.dump(self.model, model_file)
-#                 model_file.close()
-        elif model_path.endswith('.p'):
-            self.model = model_path
-            logger.info('Task will load model from %s', self.model)
-        else:
-            raise ValueError('Urecognised option "%s" for model_path.'%(model_path))
-        self.X_test_lists = [X_te[idx:idx+serve_chunk_size, :] for idx in
-                             range(0, len(X_te) - serve_chunk_size, serve_chunk_size)]
-        self.X_test_lists_curr = self.X_test_lists[:]
-        self.X_te_index = 0
-        self.sleep_time = sleep_time
-        self.serve_chunk_size = serve_chunk_size
+            self.img_bytes = data_file.read()
 
-    def _generate_work_list(self, size):
+#         with open(data_path, 'rb') as data_file:
+#             data = pickle.load(data_file, encoding='latin1')
+#             data_file.close()
+#         X_te = data['vali']['x'][:max_num_te_data, :]
+#         if model_path == 'train':
+#             X_tr = data['train']['x'][:max_num_tr_data, :]
+#             Y_tr = data['train']['y'][:max_num_tr_data]
+#             self.model = RandomForestRegressor()
+#             self.model.fit(X_tr, Y_tr)
+#             logger.info('Trained model %s', self.model)
+# #             # Save the image -------------------------------------------------------------
+# #             with open('../../train_data/news_rfr.p', 'wb') as model_file:
+# #                 pickle.dump(self.model, model_file)
+# #                 model_file.close()
+#         elif model_path.endswith('.p'):
+#             self.model = model_path
+#             logger.info('Task will load model from %s', self.model)
+#         else:
+#             raise ValueError('Urecognised option "%s" for model_path.'%(model_path))
+#         self.X_test_lists = [X_te[idx:idx+serve_chunk_size, :] for idx in
+#                              range(0, len(X_te) - serve_chunk_size, serve_chunk_size)]
+#         self.X_test_lists_curr = self.X_test_lists[:]
+#         self.X_te_index = 0
+        self.sleep_time = sleep_time
+        # self.serve_chunk_size = serve_chunk_size
+
+    def _generate_work_list_old(self, size):
         """ Generates a list of work. """
         kwargs = {}
         # Prepare the data ---------------------------------------------------------------------
@@ -93,3 +97,12 @@ class PredServLoadGenerator(TraceLoadGenerator):
 #         import pdb; pdb.set_trace()
         return work
 
+    def _generate_work_list(self, size):
+        """ Generates a list of work. """
+        kwargs = {}
+        enqueue_time = time.time()
+        work = GeneratorLen(
+            ([TaskContainer(self.base_task, timestamps={'enqueue_time': enqueue_time}),
+            [None, self.img_bytes, self.sleep_time], kwargs]
+            for _ in range(size)), size)
+        return work
